@@ -56,9 +56,11 @@ int main() {
   // start in lane 1
   int lane = 1;
   double ref_vel = 0.0;   // mph
+  double speed_diff = 0.224;  // mph
+  double max_acc = 49.5;  // mph
 
   h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy, &lane]
+               &map_waypoints_dx,&map_waypoints_dy, &lane, &speed_diff, &max_acc]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -102,39 +104,72 @@ int main() {
           
           int prev_size = previous_path_x.size();
 
-          if(prev_size > 0){
+          if (prev_size > 0){
             car_s = end_path_s;
           }
 
-          bool too_close = false;
+          bool car_left = false;
+          bool car_right = false;
+          bool car_ahead = false;
 
           // find ref_v _to use
           for(unsigned int i = 0; i < sensor_fusion.size(); i++){
             // car is in my lane
             float d = sensor_fusion[i][6];
-            if(d < (2.0 + 4.0 * lane + 2.0) && d > (2.0 + 4.0 * lane - 2.0)){
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
-              
-              check_car_s += ((double)prev_size * 0.02 * check_speed);
+            unsigned int lane_ass;  // lane assignment
 
-              // check s values greater than mine and s gap
-              if((check_car_s > car_s) && (check_car_s - car_s) < 30){
-                too_close = true;
-              }
+            // check the lane assignment
+            if (laneCheck(0, 4, d)){
+              lane_ass = 0;
+            }
+            else if (laneCheck(4, 8, d)){
+              lane_ass = 1;
+            }
+            else if (laneCheck(8, 12, d)){
+              lane_ass = 2;
+            }
+
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];
+            
+            check_car_s += ((double)prev_size * 0.02 * check_speed);
+
+            // determine which lane ego vehilcle should be on
+            double thresh = 40.0;
+            if (lane == lane_ass){
+              car_ahead |= (check_car_s > car_s) && ((check_car_s - car_s) < thresh);
+            }
+
+            else if (lane_ass-lane == 1){
+              car_right |= ((car_s + thresh) > check_car_s) && ((car_s - thresh) < check_car_s);
+            }
+
+            else if (lane_ass-lane == -1){
+              car_left |= ((car_s + thresh) > check_car_s) && ((car_s - thresh) < check_car_s);
             }
           }
 
-          if(too_close){
-            ref_vel -= 0.224;
+          // change the lane only if car_ahead is true
+          if (car_ahead){
+            if (!car_right && lane != 2){
+              lane++;
+            }
+
+            else if (!car_left && lane != 0){
+              lane--;
+            }
+
+            else {
+              ref_vel -= speed_diff;
+            }
+            
           }
 
-          else if(ref_vel < 49.5){
-            ref_vel += 0.224;
+          else if (ref_vel < max_acc){
+            ref_vel += speed_diff;
           }
-
 
           vector<double> ptsx;
           vector<double> ptsy;
@@ -142,7 +177,7 @@ int main() {
           double ref_y = car_y;
           double ref_yaw = deg2rad(car_yaw);
 
-          if(prev_size < 2){
+          if (prev_size < 2){
             // Use two points that make the path tangent to the car
             double prev_car_x = car_x - cos(car_yaw);
             double prev_car_y = car_y - sin(car_yaw);
@@ -239,17 +274,6 @@ int main() {
             next_y_vals.emplace_back(y_point);
 
           }
-
-          // double dist_inc = 0.5;
-          // for (unsigned  int i = 0; i < 50; i++)
-          // {
-          //   double next_s = car_s + (i + 1) * dist_inc;
-          //   double next_d = 6.0;
-
-          //   vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-          //   next_x_vals.emplace_back(xy[0]);
-          //   next_y_vals.emplace_back(xy[1]);
-          // }
 
           json msgJson;   
           msgJson["next_x"] = next_x_vals;

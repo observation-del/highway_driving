@@ -154,4 +154,9 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
   return {x,y};
 }
 
+
+bool laneCheck(const unsigned int left, const unsigned int right, const float offset){
+  return (left <= offset && offset < right);
+}
+
 #endif  // HELPERS_H
