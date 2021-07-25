@@ -109,10 +109,10 @@ int main() {
           bool too_close = false;
 
           // find ref_v _to use
-          for(unsigned int  = 0; i < sensor_fusion.size(); i++){
+          for(unsigned int i = 0; i < sensor_fusion.size(); i++){
             // car is in my lane
             float d = sensor_fusion[i][6];
-            if(d < (2.0 + 4.0 * lane + 2.0)) && d > (2.0 + 4.0 * lane - 2.0)){
+            if(d < (2.0 + 4.0 * lane + 2.0) && d > (2.0 + 4.0 * lane - 2.0)){
               double vx = sensor_fusion[i][3];
               double vy = sensor_fusion[i][4];
               double check_speed = sqrt(vx*vx + vy*vy);
@@ -121,7 +121,7 @@ int main() {
               check_car_s += ((double)prev_size * 0.02 * check_speed);
 
               // check s values greater than mine and s gap
-              if((check_car_s > car_s) && (check_cars - car_s) < 30)){
+              if((check_car_s > car_s) && (check_car_s - car_s) < 30){
                 ref_vel = 29.5;
               }
             }
